@@ -69,16 +69,22 @@ ShopLink has two sides: a private seller dashboard and a public checkout page th
 
 ## Architecture
 
-A React single-page app talks to a Go JSON API, which stores everything in PostgreSQL; the two halves live in one repo and deploy separately.
+A React single-page app talks to a Go JSON API, which stores everything in PostgreSQL; the two halves live in one repo and run as Docker containers on one VPS, behind Caddy on a single domain.
 
 ```mermaid
 flowchart LR
-  Seller["Seller (logged in)"] --> React
-  Buyer["Buyer (via shared link)"] --> React
-  React["React app<br/>Seller dashboard + public checkout<br/>Vercel or Netlify"] <-->|JSON + cookie| API
-  API["Go API<br/>Sessions, products, forms, orders<br/>Stock in transactions<br/>Render or Fly.io"] <-->|SQL| DB
-  DB[("PostgreSQL<br/>Hosted free tier / Docker locally")]
+  Seller["Seller (logged in)"] --> Caddy
+  Buyer["Buyer (via shared link)"] --> Caddy
+  subgraph VPS["VPS (Docker Compose)"]
+    Caddy["Caddy<br/>HTTPS, serves the React app<br/>proxies /api to Go"]
+    API["Go API<br/>Sessions, products, forms, orders<br/>Stock in transactions"]
+    DB[("PostgreSQL<br/>no public port")]
+    Caddy <-->|"/api: JSON + cookie"| API
+    API <-->|SQL| DB
+  end
 ```
+
+The React app (seller dashboard and public checkout) is built into static files that Caddy serves. Because the app and the API share one domain, the login cookie is same-site and production needs no CORS. Locally, the same pieces run with Docker Compose and the Vite dev server.
 
 Sellers and buyers both use the React app, which reaches data only through the Go API. That makes the API the single place where login, ownership, and stock rules are enforced.
 
@@ -88,10 +94,10 @@ Sellers and buyers both use the React app, which reaches data only through the G
 | --- | --- | --- |
 | Frontend | React + Vite + TypeScript, React Router | The most-requested frontend stack in job ads; TypeScript lets the agent catch its own mistakes |
 | Backend | Go 1.22+ standard library `net/http` (built-in route patterns), `pgx` database driver | No framework magic, so every line is yours to explain |
-| Database | PostgreSQL, run locally with Docker Compose | Real transactions and row locking for the stock rule; free hosted tiers exist |
+| Database | PostgreSQL, run locally with Docker Compose | Real transactions and row locking for the stock rule; the same Docker setup runs locally and on the server |
 | Migrations | Plain SQL files with a migration tool (goose or golang-migrate) | Schema changes are reviewable in pull requests |
 | Login | Server-side sessions in an HttpOnly, Secure, SameSite cookie; bcrypt password hashing | Simpler and safer than JWTs for a browser app, and easy to explain |
-| Hosting | Frontend on Vercel or Netlify; API on Render or Fly.io; database on a hosted Postgres free tier | Free or cheap, with automatic deploys from GitHub |
+| Hosting | One VPS (2 vCPU, 2 GB RAM, 40 GB disk) running Docker Compose: Caddy, the Go API, and Postgres. Images are built in GitHub Actions, pushed to ghcr.io, and pulled by the server | No cold starts for recruiters, a fixed monthly cost, and same-site cookies; in exchange you handle server upkeep and backups |
 
 **Data model**
 
@@ -183,12 +189,13 @@ Every seller route checks that the record belongs to the logged-in seller and re
 
 The agent reaches the database through the terminal, using the same local Postgres you see in DBeaver; it never has a path to production.
 
-**The agent sets up the database.** In Phase 0 it writes the Docker Compose service, the init script that creates both database users, the first migration, and a seed script with a demo seller and sample products. Then it runs them and confirms the result with `make check`. Because the whole setup is code, `make db-reset` rebuilds the local database from scratch in seconds, so the agent can start clean whenever it needs to. The one step it doesn't do is create your account with a hosted Postgres provider: you sign up and paste the connection string into the hosting settings yourself.
+**The agent sets up the database.** In Phase 0 it writes the Docker Compose service, the init script that creates both database users, the first migration, and a seed script with a demo seller and sample products. Then it runs them and confirms the result with `make check`. Because the whole setup is code, `make db-reset` rebuilds the local database from scratch in seconds, so the agent can start clean whenever it needs to. The one thing it doesn't do is touch the server: you set up the VPS and write its production `.env` yourself.
 
 - **Two database users,** created by an init script in Docker Compose: `shoplink` owns the schema and is used by the app and migrations. `shoplink_readonly` can only read, and is what the agent uses to inspect data.
 - **Agent inspects with `make db-shell`,** which wraps `docker compose exec db psql -U shoplink_readonly shoplink`. It can run any `SELECT` but can't change data.
 - **Schema changes only through migration files:** `make migration name=<name>` creates one, `make migrate` applies it, and the file is reviewed in the pull request like any code.
-- **Production stays out of reach:** its connection string lives only in the hosting platform's settings. It never appears in the repo, `.env`, `CLAUDE.md`, or tickets.
+- **Production stays out of reach:** the production database runs in a container on the VPS with no port open to the internet, and its password lives only in the server's `.env`. That password and the server's SSH deploy key never appear in the repo, the local `.env`, `CLAUDE.md`, or tickets, and the agent never gets a shell on the server.
+- **Nightly backups:** a scheduled `pg_dump` copies the production database to storage outside the server and keeps the last 14 dumps. Restore steps live in `docs/deploy.md` and are tested once.
 - **CI and the GitHub Action** start an empty Postgres for each run, apply migrations, run the tests, and throw it away.
 - **You use DBeaver** on `localhost:5432` with the credentials from `.env` (copied from the committed `.env.example`). Log in as `shoplink` when you want to edit test data by hand.
 
@@ -218,7 +225,7 @@ AI coding agents (Claude Code) write most of the code in small, test-first steps
 - When a bug reaches the demo, first write the test that would have caught it.
 - Keep a short `docs/agent-notes.md` log of what worked and what didn't. It makes a strong interview story.
 
-**Continuous integration:** a GitHub Actions workflow runs `make check` and the end-to-end tests on every push and pull request. Merges to `main` deploy automatically.
+**Continuous integration:** a GitHub Actions workflow runs `make check` and the end-to-end tests on every push and pull request. Merges to `main` build the Docker images, push them to ghcr.io, and deploy to the VPS over SSH; the deploy fails if `/healthz` doesn't answer afterwards.
 
 ## Ticket workflow
 
@@ -254,7 +261,7 @@ A failing check sends work back to the agent before you ever see it, and your re
 **Guardrails**
 
 - Branch protection on `main`: merging needs passing CI and your approval. The agent never merges.
-- Secrets (database URL, API key) live in GitHub and host settings, never in the repo or in tickets.
+- Secrets (database password, SSH deploy key, API key) live in GitHub secrets and the server's `.env`, never in the repo or in tickets.
 - The GitHub Action uses an API key billed per use. Set a monthly spending limit before turning it on.
 - Tickets stay small: one feature slice each, such as "seller can create a product (API + form + tests)".
 
@@ -262,8 +269,8 @@ A failing check sends work back to the agent before you ever see it, and your re
 
 Five phases, each ending with something deployed and showable; phase 4 is optional.
 
-1. **Phase 0: Foundation.** Repo, `CLAUDE.md`, issue template, board, local database set up by the agent (Docker Compose, two database users, first migration, seed data), empty Go server with a `/healthz` route, empty React app, `make check`, CI, and both halves deployed.
-   - Done when: CI is green and the deployed frontend shows "API OK" from the deployed backend.
+1. **Phase 0: Foundation.** Repo, `CLAUDE.md`, issue template, board, local database set up by the agent (Docker Compose, two database users, first migration, seed data), empty Go server with a `/healthz` route, empty React app, `make check`, CI, the VPS set up, and the app deployed to it with nightly backups.
+   - Done when: CI is green and the live site shows "API OK" from the backend over HTTPS.
 2. **Phase 1: Seller accounts and products.** Sign up, log in, log out, and product add/edit/archive with image URL.
    - Done when: a seller can manage products on the live site, and tests prove one seller can't read another's products.
 3. **Phase 2: Checkout forms and ordering.** Create and switch off forms, the public checkout page, placing orders, stock handling.
@@ -275,14 +282,16 @@ Five phases, each ending with something deployed and showable; phase 4 is option
 
 ## Decisions, open items, and builder's choices
 
-You decided the app, its name, the frontend-plus-Go-API split, and the agentic, ticket-driven workflow; the rest below are my calls, which you can overturn.
+You decided the app, its name, the frontend-plus-Go-API split, the agentic, ticket-driven workflow, and hosting on a single VPS; the rest below are my calls, which you can overturn.
+
+**Hosting on a VPS (decided Nov 18, 2026):** you chose one VPS over Render and Vercel. It avoids free-tier servers that sleep and make a recruiter's first click wait, keeps the cost fixed, and puts the app and API on one domain. The price is server upkeep, HTTPS, and backups, which are covered in Phase 0.
 
 **Calls made for you**
 
 - React + Vite + TypeScript for the frontend. You haven't confirmed your frontend tools yet.
 - Orders first, payments last.
-- PostgreSQL instead of SQLite. Hosted platforms handle Postgres more easily, and it makes the stock rule a good interview topic.
-- Cookie sessions instead of JWTs, Go's standard library instead of a framework, GitHub Issues instead of Jira or Linear, and the hosting picks above.
+- PostgreSQL instead of SQLite. It is the usual production choice, and it makes the stock rule a good interview topic.
+- Cookie sessions instead of JWTs, Go's standard library instead of a framework, GitHub Issues instead of Jira or Linear, and Caddy for HTTPS on the VPS.
 - Agents write most of the code and you review every line.
 
 **Open items**
