@@ -1,0 +1,26 @@
+# Local development only. Production has its own compose file (see #9).
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      # Superuser, used only by the init script and admin tasks.
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?copy .env.example to .env}
+      # Read by db/init/01-users.sh to create the app and read-only users.
+      SHOPLINK_DB_PASSWORD: ${SHOPLINK_DB_PASSWORD:?copy .env.example to .env}
+      SHOPLINK_READONLY_PASSWORD: ${SHOPLINK_READONLY_PASSWORD:?copy .env.example to .env}
+    ports:
+      # Bound to localhost only, for DBeaver and the API running on your machine.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Runs once, when the data volume is empty.
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d shoplink"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata:
