@@ -260,7 +260,7 @@ A failing check sends work back to the agent before you ever see it, and your re
 
 **Guardrails**
 
-- Branch protection on `main`: merging needs passing CI and your approval. The agent never merges.
+- Branch protection on `main`: every change goes through a pull request, and CI must pass once it exists. Required approvals are set to 0, because GitHub won't let you approve pull requests opened from your own account, which is the account the agent uses. You review every diff, and your merge is the sign-off. The agent never merges.
 - Secrets (database password, SSH deploy key, API key) live in GitHub secrets and the server's `.env`, never in the repo or in tickets.
 - The GitHub Action uses an API key billed per use. Set a monthly spending limit before turning it on.
 - Tickets stay small: one feature slice each, such as "seller can create a product (API + form + tests)".
