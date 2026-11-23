@@ -64,7 +64,7 @@ ShopLink has two sides: a private seller dashboard and a public checkout page th
 
 - A seller can only see and change their own products, forms, and orders.
 - Placing an order checks and reduces stock in one database transaction, so two buyers can't buy the last item at the same time. Cancelling an order returns its stock.
-- Prices are stored as whole numbers of the smallest unit (cents), never as decimals, and each order saves the price at the time of purchase.
+- Prices are in Indonesian rupiah (IDR), stored as whole numbers of sen (1/100 rupiah) in `bigint` columns, never as decimals or floats: Rp 1.000,75 is `100075`. Each order saves the price at the time of purchase.
 - A switched-off form, or one whose products are all out of stock, shows a clear message instead of the order form.
 
 ## Architecture
@@ -129,7 +129,7 @@ erDiagram
     bigint seller_id FK
     text name
     text description
-    int price_cents
+    bigint price_sen
     int stock
     text image_url
     timestamptz archived_at
@@ -155,18 +155,18 @@ erDiagram
     text buyer_phone
     text buyer_address
     text status
-    int total_cents
+    bigint total_sen
     timestamptz created_at
   }
   order_items {
     bigint order_id PK,FK
     bigint product_id PK,FK
     int quantity
-    int unit_price_cents
+    bigint unit_price_sen
   }
 ```
 
-Schema rules: `stock` has a `CHECK (stock >= 0)` constraint as a second safety net behind the transaction. Products are archived (`archived_at`), never deleted, because old orders point to them. `order_items.unit_price_cents` keeps the price paid even if the product price changes later.
+Schema rules: `stock` has a `CHECK (stock >= 0)` constraint as a second safety net behind the transaction. Products are archived (`archived_at`), never deleted, because old orders point to them. `order_items.unit_price_sen` keeps the price paid even if the product price changes later. Money columns are `bigint` sen with `CHECK (... between 0 and 9007199254740991)`, JavaScript's `Number.MAX_SAFE_INTEGER`, so amounts reach the browser exactly as JSON numbers; `integer` would top out at Rp 21.474.836,47.
 
 **API endpoints**
 
