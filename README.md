@@ -2,6 +2,17 @@
 
 ShopLink is a portfolio project: sellers add products, create a checkout form, and share its link, and buyers order through that link without an account. It is a React + TypeScript frontend talking to a Go JSON API backed by PostgreSQL, built with AI coding agents (Claude Code) writing most of the code from GitHub issues and me reviewing every pull request. See [docs/design.md](docs/design.md) for the full design.
 
+## API and checks
+
+Needs Go and Docker.
+
+| Command | What it does |
+| --- | --- |
+| `make api` | Run the Go API on `localhost:8080` against the local database; `curl localhost:8080/healthz` should return `{"status":"ok"}`. Ctrl-C stops it cleanly |
+| `make check` | What every pull request must pass: `gofmt`, `go vet`, `golangci-lint`, and the Go unit and integration tests (starts Postgres if needed) |
+
+The API reads `DATABASE_URL`, `PORT` (default 8080) and `FRONTEND_ORIGIN` from `.env`. `FRONTEND_ORIGIN` is the only browser origin allowed to call the API with cookies (the Vite dev server); leave it empty in production, where the app and the API share a domain.
+
 ## Local database
 
 Needs Docker. `make db-up` creates `.env` from `.env.example` on first run and starts Postgres on `localhost:5432`.

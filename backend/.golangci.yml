@@ -1,0 +1,27 @@
+# golangci-lint v2, pinned in golangci-lint.mod and run by `make check`.
+version: "2"
+
+linters:
+  # standard = errcheck, govet, ineffassign, staticcheck, unused
+  default: standard
+  enable:
+    - bodyclose # HTTP response bodies are closed
+    - errorlint # errors are compared with errors.Is/As, wrapped with %w
+    - gosec # security checks (timeouts on servers, SQL built from strings, ...)
+    - misspell
+    - noctx # outgoing requests and DB calls carry a context
+    - nolintlint # every //nolint names a linter and says why
+    - unconvert
+  settings:
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/rafifn/shoplink
