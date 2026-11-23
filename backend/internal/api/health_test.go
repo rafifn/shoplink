@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -27,10 +28,11 @@ func (f fakeDB) Ping(ctx context.Context) error {
 	return f.err
 }
 
-func newTestHandler(db Pinger) http.Handler {
+// newTestHandler logs at every level, including Debug, to logs.
+func newTestHandler(db Pinger, logs io.Writer) http.Handler {
 	return New(Options{
 		DB:          db,
-		Logger:      slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Logger:      slog.New(slog.NewTextHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug})),
 		PingTimeout: 50 * time.Millisecond,
 	})
 }
@@ -43,7 +45,7 @@ func get(t *testing.T, h http.Handler, path string) *httptest.ResponseRecorder {
 }
 
 func TestHealthzOK(t *testing.T) {
-	rec := get(t, newTestHandler(fakeDB{}), "/healthz")
+	rec := get(t, newTestHandler(fakeDB{}, io.Discard), "/healthz")
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
@@ -70,8 +72,9 @@ func TestHealthzDatabaseDown(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var logs bytes.Buffer
 			start := time.Now()
-			rec := get(t, newTestHandler(tt.db), "/healthz")
+			rec := get(t, newTestHandler(tt.db, &logs), "/healthz")
 
 			if elapsed := time.Since(start); elapsed > time.Second {
 				t.Errorf("healthz took %v; the ping timeout should cut it short", elapsed)
@@ -86,7 +89,25 @@ func TestHealthzDatabaseDown(t *testing.T) {
 			if strings.Contains(rec.Body.String(), "password") || strings.Contains(rec.Body.String(), "shoplink") {
 				t.Errorf("body leaks database details: %s", rec.Body.String())
 			}
+			if !strings.Contains(logs.String(), "level=ERROR") || !strings.Contains(logs.String(), "database ping failed") {
+				t.Errorf("a real database failure must be logged at ERROR; logs:\n%s", logs.String())
+			}
 		})
+	}
+}
+
+// A browser that cancels its own request (React StrictMode in dev, a closed
+// tab) is not a database outage and must not be logged as one.
+func TestHealthzClientGone(t *testing.T) {
+	var logs bytes.Buffer
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel() // the client is already gone when the ping runs
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "/healthz", nil)
+
+	newTestHandler(fakeDB{block: true}, &logs).ServeHTTP(httptest.NewRecorder(), req)
+
+	if strings.Contains(logs.String(), "level=ERROR") || strings.Contains(logs.String(), "database ping failed") {
+		t.Errorf("a cancelled request was logged as a database failure; logs:\n%s", logs.String())
 	}
 }
 
