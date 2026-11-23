@@ -1,8 +1,9 @@
 // Command api runs the ShopLink JSON API. Run it locally with `make api`.
 //
 // Settings come from environment variables (see .env.example): DATABASE_URL
-// (required), PORT (default 8080), and FRONTEND_ORIGIN (the one origin CORS
-// allows; empty in production, where the app and the API share a domain).
+// (required), PORT (default 8080), FRONTEND_ORIGIN (the one origin CORS
+// allows; empty in production, where the app and the API share a domain), and
+// MIGRATE_ON_START (apply pending migrations before listening; on in production).
 //
 // On SIGINT (Ctrl-C) or SIGTERM (docker stop) it stops taking new connections,
 // lets in-flight requests finish, closes the database pool, and exits 0.
@@ -23,6 +24,8 @@ import (
 
 	"github.com/rafifn/shoplink/backend/internal/api"
 	"github.com/rafifn/shoplink/backend/internal/config"
+	"github.com/rafifn/shoplink/backend/internal/dbmigrate"
+	"github.com/rafifn/shoplink/backend/migrations"
 )
 
 // shutdownGrace is how long in-flight requests get after a stop signal. It is
@@ -48,11 +51,18 @@ func shutdownContext() (context.Context, context.CancelFunc) {
 	return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 }
 
-// run loads the settings, opens the port, and serves until ctx is cancelled.
+// run loads the settings, applies migrations if asked to, opens the port, and
+// serves until ctx is cancelled. A failed migration stops it before it
+// listens, so the process exits non-zero instead of serving an old schema.
 func run(ctx context.Context, getenv func(string) string, logger *slog.Logger) error {
 	cfg, err := config.Load(getenv)
 	if err != nil {
 		return err
+	}
+	if cfg.MigrateOnStart {
+		if err := dbmigrate.Up(ctx, cfg.DatabaseURL, migrations.FS, logger); err != nil {
+			return err
+		}
 	}
 	var lc net.ListenConfig
 	ln, err := lc.Listen(ctx, "tcp", ":"+cfg.Port)

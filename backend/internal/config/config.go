@@ -19,6 +19,9 @@ type Config struct {
 	// Empty means no CORS headers at all, which is right for production, where
 	// Caddy serves the app and the API from the same domain.
 	FrontendOrigin string
+	// MigrateOnStart applies pending migrations before the API starts
+	// listening. On in production; locally `make migrate` does it instead.
+	MigrateOnStart bool
 }
 
 // Load reads the settings through getenv (os.Getenv in main, a map in tests).
@@ -43,6 +46,14 @@ func Load(getenv func(string) string) (Config, error) {
 
 	if cfg.FrontendOrigin != "" && !isOrigin(cfg.FrontendOrigin) {
 		return Config{}, fmt.Errorf("FRONTEND_ORIGIN must be an http(s) origin with no path or trailing slash, like http://localhost:5173; got %q", cfg.FrontendOrigin)
+	}
+
+	if v := getenv("MIGRATE_ON_START"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return Config{}, fmt.Errorf("MIGRATE_ON_START must be true or false, got %q", v)
+		}
+		cfg.MigrateOnStart = b
 	}
 
 	return cfg, nil

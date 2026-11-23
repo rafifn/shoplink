@@ -29,6 +29,17 @@ func TestLoad(t *testing.T) {
 			env:  map[string]string{"DATABASE_URL": dbURL, "FRONTEND_ORIGIN": "https://shop.example.com:8443"},
 			want: Config{DatabaseURL: dbURL, Port: "8080", FrontendOrigin: "https://shop.example.com:8443"},
 		},
+		{
+			name: "migrate on start",
+			env:  map[string]string{"DATABASE_URL": dbURL, "MIGRATE_ON_START": "true"},
+			want: Config{DatabaseURL: dbURL, Port: "8080", MigrateOnStart: true},
+		},
+		{
+			name: "migrate on start off",
+			env:  map[string]string{"DATABASE_URL": dbURL, "MIGRATE_ON_START": "false"},
+			want: Config{DatabaseURL: dbURL, Port: "8080"},
+		},
+		{name: "migrate on start not a bool", env: map[string]string{"DATABASE_URL": dbURL, "MIGRATE_ON_START": "yes"}, wantErr: "MIGRATE_ON_START"},
 		{name: "missing DATABASE_URL", env: map[string]string{}, wantErr: "DATABASE_URL"},
 		{name: "port not a number", env: map[string]string{"DATABASE_URL": dbURL, "PORT": "http"}, wantErr: "PORT"},
 		{name: "port zero", env: map[string]string{"DATABASE_URL": dbURL, "PORT": "0"}, wantErr: "PORT"},

@@ -1,0 +1,10 @@
+# Keep the build context small and free of local files.
+bin/
+*.test
+*.out
+coverage.*
+.golangci.yml
+golangci-lint.mod
+golangci-lint.sum
+.env
+.env.*

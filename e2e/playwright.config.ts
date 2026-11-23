@@ -13,20 +13,27 @@ const apiURL = `http://localhost:${process.env.PORT || '8080'}`
 // Locally, reuse servers that are already up (e.g. from `make dev`); CI always starts fresh ones.
 const reuse = !process.env.CI
 
+// E2E_BASE_URL tests a stack that is already running instead of starting the
+// dev servers, e.g. the production compose file (scripts/check-prod-stack.sh).
+// E2E_IGNORE_HTTPS_ERRORS accepts Caddy's local certificate for https://localhost;
+// never set it against a real domain, where a certificate error is a real failure.
+const externalURL = process.env.E2E_BASE_URL
+
 export default defineConfig({
   testDir: './tests',
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: frontendURL,
+    baseURL: externalURL || frontendURL,
+    ignoreHTTPSErrors: !!process.env.E2E_IGNORE_HTTPS_ERRORS,
     trace: 'on-first-retry',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 
   // Postgres isn't started here: `make e2e` runs `make db-up` first. The API is
   // only counted as up once /healthz answers 200, i.e. it can reach the database.
-  webServer: [
+  webServer: externalURL ? undefined : [
     {
       name: 'api',
       cwd: '../backend',

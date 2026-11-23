@@ -1,0 +1,8 @@
+# Build context for deploy/web.Dockerfile is the repo root: send only what it uses.
+*
+!frontend/
+!deploy/Caddyfile
+frontend/node_modules/
+frontend/dist/
+**/.env
+**/.env.*
