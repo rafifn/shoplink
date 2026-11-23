@@ -1,11 +1,35 @@
 COMPOSE := docker compose
 GOOSE := cd backend && go tool goose -dir migrations
+# golangci-lint is pinned in its own modfile so its dependencies stay out of go.mod.
+GOLANGCI_LINT := cd backend && go tool -modfile=golangci-lint.mod golangci-lint
 
 # Local settings (DATABASE_URL, passwords). Values given on the command line win,
 # e.g. make migrate DATABASE_URL=postgres://...
 -include .env
+# Passed to the API and the Go tests through the environment, so make never
+# echoes the database password as part of a command line.
+export DATABASE_URL PORT FRONTEND_ORIGIN
 
-.PHONY: db-up db-down db-shell db-test db-reset migration migrate seed
+.PHONY: check go-check api db-up db-down db-shell db-test db-reset migration migrate seed
+
+## check: everything a pull request must pass (the frontend half joins in #6)
+check: go-check
+
+## go-check: gofmt, go vet, golangci-lint, then unit and integration tests against the local Postgres
+go-check: db-up
+	@test -n "$(DATABASE_URL)" || { echo "DATABASE_URL is not set; see .env.example" >&2; exit 1; }
+	@unformatted=$$(cd backend && gofmt -l .); \
+	if [ -n "$$unformatted" ]; then \
+		echo "gofmt: these files need formatting (fix with: cd backend && gofmt -w .):" >&2; \
+		echo "$$unformatted" >&2; exit 1; \
+	fi
+	cd backend && go vet ./...
+	$(GOLANGCI_LINT) run ./...
+	cd backend && go test -race -count=1 ./...
+
+## api: run the Go API on PORT (default 8080) against the local database; Ctrl-C stops it
+api: db-up
+	cd backend && go run ./cmd/api
 
 # Create .env from the committed example the first time.
 .env:
