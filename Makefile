@@ -10,10 +10,25 @@ GOLANGCI_LINT := cd backend && go tool -modfile=golangci-lint.mod golangci-lint
 # echoes the database password as part of a command line.
 export DATABASE_URL PORT FRONTEND_ORIGIN
 
-.PHONY: check go-check api db-up db-down db-shell db-test db-reset migration migrate seed
+.PHONY: check go-check web-check dev api db-up db-down db-shell db-test db-reset migration migrate seed
 
-## check: everything a pull request must pass (the frontend half joins in #6)
-check: go-check
+## check: everything a pull request must pass (Go and frontend)
+check: go-check web-check
+
+## dev: start Postgres, the Go API (:8080) and the Vite dev server (:5173); Ctrl-C stops them
+dev: db-up
+	@./scripts/dev.sh
+
+## web-check: TypeScript type-check, ESLint, and Vitest for the frontend
+web-check: frontend/node_modules
+	cd frontend && npm run -s typecheck
+	cd frontend && npm run -s lint
+	cd frontend && npm test
+
+# Install frontend dependencies when package-lock.json changes.
+frontend/node_modules: frontend/package-lock.json
+	cd frontend && npm ci
+	@touch $@
 
 ## go-check: gofmt, go vet, golangci-lint, then unit and integration tests against the local Postgres
 go-check: db-up
