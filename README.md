@@ -10,6 +10,7 @@ Needs Go, Node.js 22+, and Docker.
 | --- | --- |
 | `make dev` | Start Postgres, the Go API on `localhost:8080`, and the frontend on http://localhost:5173, which should say "API OK". Ctrl-C stops everything; if one of them crashes, the other is stopped too |
 | `make api` | Run only the Go API; `curl localhost:8080/healthz` should return `{"status":"ok"}` |
+| `make e2e` | Playwright end-to-end tests in Chromium (the first run downloads it). Starts Postgres, the API and the frontend, or reuses them if `make dev` is running. After a failure, `cd e2e && npx playwright show-report` shows what happened |
 | `make check` | What every pull request must pass. Go: `gofmt`, `go vet`, `golangci-lint`, unit and integration tests (starts Postgres if needed). Frontend: TypeScript type-check, ESLint, Vitest |
 
 Settings live in the one `.env` file (copied from `.env.example`):
