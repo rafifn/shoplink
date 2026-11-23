@@ -10,7 +10,7 @@ GOLANGCI_LINT := cd backend && go tool -modfile=golangci-lint.mod golangci-lint
 # echoes the database password as part of a command line.
 export DATABASE_URL PORT FRONTEND_ORIGIN
 
-.PHONY: check go-check web-check dev api db-up db-down db-shell db-test db-reset migration migrate seed
+.PHONY: check go-check web-check dev e2e api db-up db-down db-shell db-test db-reset migration migrate seed
 
 ## check: everything a pull request must pass (Go and frontend)
 check: go-check web-check
@@ -28,6 +28,15 @@ web-check: frontend/node_modules
 # Install frontend dependencies when package-lock.json changes.
 frontend/node_modules: frontend/package-lock.json
 	cd frontend && npm ci
+	@touch $@
+
+## e2e: Playwright end-to-end tests in Chromium; starts the API and the frontend, or reuses `make dev`
+e2e: db-up frontend/node_modules e2e/node_modules
+	cd e2e && npx playwright install chromium
+	cd e2e && npx playwright test
+
+e2e/node_modules: e2e/package-lock.json
+	cd e2e && npm ci
 	@touch $@
 
 ## go-check: gofmt, go vet, golangci-lint, then unit and integration tests against the local Postgres
