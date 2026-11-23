@@ -24,7 +24,7 @@ Design: docs/design.md. Read the section your ticket points to before starting.
 3. Write a failing test for the acceptance criteria first, then the code.
 4. Run make check after every change and fix all failures before moving on.
 5. Open a PR whose description says "Closes #<issue>" and lists what you tested.
-6. Never merge, never push to main, never edit CI or branch protection.
+6. Never merge, never push to main, never change branch protection.
 
 ## Rules
 - Every seller query filters by seller_id from the session. Return 404, not 403, for other sellers' records.
