@@ -23,17 +23,19 @@ const demoShopName = "Demo Shop"
 type sampleProduct struct {
 	name        string
 	description string
-	priceCents  int
+	priceSen    int64 // rupiah x 100: Rp 85.000 is 8_500_000
 	stock       int
 }
 
 // One product has a single item left, which is handy for trying the
-// "two buyers, last item" case by hand.
+// "two buyers, last item" case by hand. The teak table costs more than the
+// old integer column could hold (Rp 21.474.836,47).
 var sampleProducts = []sampleProduct{
-	{"Hand-poured soy candle", "Sandalwood and vanilla, 200 g, about 40 hours of burn time.", 2400, 25},
-	{"Stoneware mug", "Wheel-thrown, 350 ml, dishwasher safe.", 1800, 12},
-	{"Linen tote bag", "Natural linen with an inside pocket, 38 x 42 cm.", 3200, 30},
-	{"Single-origin coffee beans", "Medium roast, 250 g, roasted to order.", 1600, 1},
+	{"Hand-poured soy candle", "Sandalwood and vanilla, 200 g, about 40 hours of burn time.", 8_500_000, 25},
+	{"Stoneware mug", "Wheel-thrown, 350 ml, dishwasher safe.", 6_500_000, 12},
+	{"Linen tote bag", "Natural linen with an inside pocket, 38 x 42 cm.", 12_000_000, 30},
+	{"Single-origin coffee beans", "Medium roast, 250 g, roasted to order.", 9_500_000, 1},
+	{"Teak dining table", "Solid Jepara teak, seats six, 180 x 90 cm.", 2_450_000_000, 2},
 }
 
 func main() {
@@ -87,12 +89,12 @@ func run(ctx context.Context) error {
 	added := 0
 	for _, p := range sampleProducts {
 		tag, err := tx.Exec(ctx, `
-			insert into products (seller_id, name, description, price_cents, stock)
-			select $1::bigint, $2::text, $3::text, $4::integer, $5::integer
+			insert into products (seller_id, name, description, price_sen, stock)
+			select $1::bigint, $2::text, $3::text, $4::bigint, $5::integer
 			where not exists (
 				select 1 from products where seller_id = $1::bigint and name = $2::text
 			)`,
-			sellerID, p.name, p.description, p.priceCents, p.stock,
+			sellerID, p.name, p.description, p.priceSen, p.stock,
 		)
 		if err != nil {
 			return fmt.Errorf("insert product %q: %w", p.name, err)

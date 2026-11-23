@@ -28,7 +28,7 @@ Design: docs/design.md. Read the section your ticket points to before starting.
 
 ## Rules
 - Every seller query filters by seller_id from the session. Return 404, not 403, for other sellers' records.
-- Money is integer cents (price_cents). Never use floats for money.
+- Money is rupiah in integer sen: `bigint` columns named `*_sen` (Rp 1.000,75 is 100075). Never use floats for money.
 - Stock changes happen inside a transaction with row locking.
 - Errors are JSON: {"error": {"code": "...", "message": "..."}}.
 - No secrets in code, tests, logs, or commits. Use environment variables.

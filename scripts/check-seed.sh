@@ -43,8 +43,14 @@ sql -c "create extension if not exists pgcrypto" >/dev/null
 products=$(sql -c "select count(*) from products p join users u on u.id = p.seller_id where u.email = '${DEMO_SELLER_EMAIL}'")
 (( products >= 3 && products <= 5 )) && pass "demo seller has ${products} sample products" || bad "expected 3-5 products, got ${products}"
 
-[[ "$(sql -c "select count(*) from products where price_cents <= 0 or stock < 0 or archived_at is not null")" == "0" ]] \
+[[ "$(sql -c "select count(*) from products where price_sen <= 0 or stock < 0 or archived_at is not null")" == "0" ]] \
   && pass "sample products have positive prices and are not archived" || bad "a sample product has a bad price, stock, or is archived"
+
+# Prices are rupiah in sen: anything under Rp 1.000 (100000 sen) is a leftover dollar-cents value.
+[[ "$(sql -c "select count(*) from products where price_sen < 100000")" == "0" ]] \
+  && pass "sample prices are realistic rupiah amounts in sen" || bad "a sample price is under Rp 1.000; prices must be in sen"
+[[ "$(sql -c "select count(*) from products where price_sen > 2147483647")" -ge 1 ]] \
+  && pass "a sample price is above the old integer limit" || bad "no sample price above Rp 21.474.836,47 to show bigint at work"
 
 # 2. Second seed: no errors, no duplicates.
 make -s seed DATABASE_URL="$URL" >/dev/null 2>&1 && pass "make seed again succeeds" || bad "make seed is not re-runnable"
