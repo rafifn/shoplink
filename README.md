@@ -2,16 +2,20 @@
 
 ShopLink is a portfolio project: sellers add products, create a checkout form, and share its link, and buyers order through that link without an account. It is a React + TypeScript frontend talking to a Go JSON API backed by PostgreSQL, built with AI coding agents (Claude Code) writing most of the code from GitHub issues and me reviewing every pull request. See [docs/design.md](docs/design.md) for the full design.
 
-## API and checks
+## Running and checking
 
-Needs Go and Docker.
+Needs Go, Node.js 22+, and Docker.
 
 | Command | What it does |
 | --- | --- |
-| `make api` | Run the Go API on `localhost:8080` against the local database; `curl localhost:8080/healthz` should return `{"status":"ok"}`. Ctrl-C stops it cleanly |
-| `make check` | What every pull request must pass: `gofmt`, `go vet`, `golangci-lint`, and the Go unit and integration tests (starts Postgres if needed) |
+| `make dev` | Start Postgres, the Go API on `localhost:8080`, and the frontend on http://localhost:5173, which should say "API OK". Ctrl-C stops everything; if one of them crashes, the other is stopped too |
+| `make api` | Run only the Go API; `curl localhost:8080/healthz` should return `{"status":"ok"}` |
+| `make check` | What every pull request must pass. Go: `gofmt`, `go vet`, `golangci-lint`, unit and integration tests (starts Postgres if needed). Frontend: TypeScript type-check, ESLint, Vitest |
 
-The API reads `DATABASE_URL`, `PORT` (default 8080) and `FRONTEND_ORIGIN` from `.env`. `FRONTEND_ORIGIN` is the only browser origin allowed to call the API with cookies (the Vite dev server); leave it empty in production, where the app and the API share a domain.
+Settings live in the one `.env` file (copied from `.env.example`):
+
+- The API reads `DATABASE_URL`, `PORT` (default 8080) and `FRONTEND_ORIGIN`. `FRONTEND_ORIGIN` is the only browser origin allowed to call the API with cookies (the Vite dev server); leave it empty in production, where the app and the API share a domain.
+- The frontend reads `VITE_API_URL`, the API's address. Only `VITE_` values reach the browser. Open the app at `localhost:5173`, not `127.0.0.1:5173`, or CORS will block the API.
 
 ## Local database
 
