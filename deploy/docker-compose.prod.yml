@@ -1,0 +1,70 @@
+# Production: Caddy (web), the Go API, and Postgres on one server.
+#
+# On the server (#10 sets this up): put this file in deploy/ and the database
+# init script in db/init/, next to each other, and the real values in deploy/.env
+# (copy deploy/.env.example). Then:
+#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env pull
+#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d
+#
+# Locally, `make prod-test` builds the images from source and checks the whole stack.
+
+name: shoplink
+
+services:
+  web:
+    image: ghcr.io/rafifn/shoplink-web:${IMAGE_TAG:?set IMAGE_TAG in deploy/.env}
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in deploy/.env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    volumes:
+      - caddy_data:/data # certificates: keep them, or Let's Encrypt rate limits bite
+      - caddy_config:/config
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  api:
+    image: ghcr.io/rafifn/shoplink-api:${IMAGE_TAG:?set IMAGE_TAG in deploy/.env}
+    build:
+      context: ../backend
+    environment:
+      # Use a URL-safe password (letters and digits), e.g. from `openssl rand -hex 24`.
+      DATABASE_URL: postgres://shoplink:${SHOPLINK_DB_PASSWORD:?set SHOPLINK_DB_PASSWORD in deploy/.env}@db:5432/shoplink?sslmode=disable
+      PORT: "8080"
+      MIGRATE_ON_START: "true"
+      # No FRONTEND_ORIGIN: the app and the API share one domain, so no CORS.
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      SHOPLINK_DB_PASSWORD: ${SHOPLINK_DB_PASSWORD:?set SHOPLINK_DB_PASSWORD in deploy/.env}
+      SHOPLINK_READONLY_PASSWORD: ${SHOPLINK_READONLY_PASSWORD:?set SHOPLINK_READONLY_PASSWORD in deploy/.env}
+    # No ports: only the API reaches the database, over the compose network.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../db/init:/docker-entrypoint-initdb.d:ro # creates the shoplink users on first start
+    healthcheck:
+      # Over TCP: during first-time init Postgres runs a temporary socket-only
+      # server, and the API must not migrate before the init script has finished.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d shoplink"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

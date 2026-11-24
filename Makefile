@@ -10,7 +10,7 @@ GOLANGCI_LINT := cd backend && go tool -modfile=golangci-lint.mod golangci-lint
 # echoes the database password as part of a command line.
 export DATABASE_URL PORT FRONTEND_ORIGIN
 
-.PHONY: check go-check web-check dev e2e api db-up db-down db-shell db-test db-reset migration migrate seed
+.PHONY: check go-check web-check dev e2e prod-test api db-up db-down db-shell db-test db-reset migration migrate seed
 
 ## check: everything a pull request must pass (Go and frontend)
 check: go-check web-check
@@ -34,6 +34,11 @@ frontend/node_modules: frontend/package-lock.json
 e2e: db-up frontend/node_modules e2e/node_modules
 	cd e2e && npx playwright install chromium
 	cd e2e && npx playwright test
+
+## prod-test: build and run the production stack (deploy/) with DOMAIN=localhost and check it end to end
+prod-test: e2e/node_modules
+	cd e2e && npx playwright install chromium
+	./scripts/check-prod-stack.sh
 
 e2e/node_modules: e2e/package-lock.json
 	cd e2e && npm ci

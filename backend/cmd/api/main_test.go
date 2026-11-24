@@ -155,3 +155,24 @@ func TestShutdownOnSignal(t *testing.T) {
 		})
 	}
 }
+
+// With MIGRATE_ON_START, a migration failure stops the API before it listens,
+// so main exits non-zero and Docker restarts it or the deploy fails.
+func TestRunFailsWhenMigrationsFail(t *testing.T) {
+	env := map[string]string{
+		"DATABASE_URL":     "postgres://shoplink@127.0.0.1:1/shoplink?sslmode=disable&connect_timeout=1", // nothing listens on port 1
+		"PORT":             "18089",
+		"MIGRATE_ON_START": "true",
+	}
+	done := make(chan error, 1)
+	go func() { done <- run(t.Context(), func(k string) string { return env[k] }, quiet) }()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("run returned nil although migrations could not run")
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("run kept going although migrations could not run")
+	}
+}
