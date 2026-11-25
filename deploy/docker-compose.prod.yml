@@ -38,6 +38,7 @@ services:
       DATABASE_URL: postgres://shoplink:${SHOPLINK_DB_PASSWORD:?set SHOPLINK_DB_PASSWORD in deploy/.env}@db:5432/shoplink?sslmode=disable
       PORT: "8080"
       MIGRATE_ON_START: "true"
+      COOKIE_SECURE: "true" # HTTPS only (also the default; stated so nobody copies the local false)
       # No FRONTEND_ORIGIN: the app and the API share one domain, so no CORS.
     depends_on:
       db:

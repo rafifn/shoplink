@@ -22,6 +22,9 @@ type Config struct {
 	// MigrateOnStart applies pending migrations before the API starts
 	// listening. On in production; locally `make migrate` does it instead.
 	MigrateOnStart bool
+	// CookieSecure marks the session cookie Secure (sent only over HTTPS).
+	// On by default; COOKIE_SECURE=false turns it off for local http.
+	CookieSecure bool
 }
 
 // Load reads the settings through getenv (os.Getenv in main, a map in tests).
@@ -54,6 +57,15 @@ func Load(getenv func(string) string) (Config, error) {
 			return Config{}, fmt.Errorf("MIGRATE_ON_START must be true or false, got %q", v)
 		}
 		cfg.MigrateOnStart = b
+	}
+
+	cfg.CookieSecure = true
+	if v := getenv("COOKIE_SECURE"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return Config{}, fmt.Errorf("COOKIE_SECURE must be true or false, got %q", v)
+		}
+		cfg.CookieSecure = b
 	}
 
 	return cfg, nil

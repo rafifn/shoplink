@@ -8,7 +8,7 @@ GOLANGCI_LINT := cd backend && go tool -modfile=golangci-lint.mod golangci-lint
 -include .env
 # Passed to the API and the Go tests through the environment, so make never
 # echoes the database password as part of a command line.
-export DATABASE_URL PORT FRONTEND_ORIGIN
+export DATABASE_URL PORT FRONTEND_ORIGIN COOKIE_SECURE
 
 .PHONY: check go-check web-check dev e2e prod-test api db-up db-down db-shell db-test db-reset migration migrate seed
 

@@ -25,6 +25,7 @@ import (
 	"github.com/rafifn/shoplink/backend/internal/api"
 	"github.com/rafifn/shoplink/backend/internal/config"
 	"github.com/rafifn/shoplink/backend/internal/dbmigrate"
+	"github.com/rafifn/shoplink/backend/internal/store"
 	"github.com/rafifn/shoplink/backend/migrations"
 )
 
@@ -89,6 +90,8 @@ func serve(ctx context.Context, cfg config.Config, ln net.Listener, logger *slog
 			DB:             pool,
 			Logger:         logger,
 			FrontendOrigin: cfg.FrontendOrigin,
+			Store:          store.New(pool),
+			CookieSecure:   cfg.CookieSecure,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
