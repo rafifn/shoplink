@@ -1,5 +1,7 @@
-import { Link, Outlet } from 'react-router'
+import { useState } from 'react'
+import { Link, Outlet, useNavigate } from 'react-router'
 
+import { apiFetch } from './api'
 import { AuthProvider } from './auth/AuthProvider'
 import { useAuth } from './auth/auth'
 
@@ -25,8 +27,8 @@ function Layout() {
           {state.status === 'loggedIn' && (
             <>
               <Link to="/products">Products</Link>
-              {/* The logout button joins the shop name in #32. */}
               <span className="shop-name">{state.seller.shopName}</span>
+              <LogoutButton />
             </>
           )}
           {state.status === 'loggedOut' && (
@@ -40,6 +42,47 @@ function Layout() {
       <main className="page">
         <Outlet />
       </main>
+    </>
+  )
+}
+
+/** Ends the session, then shows the logged-out home page. On failure the seller stays logged in. */
+function LogoutButton() {
+  const { setSeller } = useAuth()
+  const navigate = useNavigate()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function logOut() {
+    setBusy(true)
+    setError('')
+    try {
+      await apiFetch('/api/auth/logout', { method: 'POST' })
+      // Leave the seller-only page before clearing the login state; otherwise
+      // it re-renders logged out and redirects to /login. flushSync applies the
+      // route change right away instead of as a low-priority transition.
+      await navigate('/', { flushSync: true })
+      setSeller(null)
+    } catch {
+      setError("Couldn't log out. Please try again.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className="link-button"
+        disabled={busy}
+        onClick={() => {
+          void logOut()
+        }}
+      >
+        Log out
+      </button>
+      {error && <span role="alert">{error}</span>}
     </>
   )
 }

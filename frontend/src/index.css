@@ -93,3 +93,11 @@ button:disabled {
   opacity: 0.6;
   cursor: progress;
 }
+
+/* A button that looks like the header's links. */
+.link-button {
+  padding: 0;
+  background: none;
+  color: #0969da;
+  text-decoration: underline;
+}

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/mail"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"golang.org/x/crypto/bcrypt"
@@ -15,6 +16,20 @@ import (
 
 // bcryptCost matches the seed (cmd/seed), so every stored hash is alike.
 const bcryptCost = bcrypt.DefaultCost
+
+// compareHash checks a password against a bcrypt hash. A variable so tests
+// can count the comparisons.
+var compareHash = bcrypt.CompareHashAndPassword
+
+// dummyHash is compared against when an email has no account, so a failed
+// login takes about as long either way and timing can't reveal accounts.
+var dummyHash = sync.OnceValue(func() []byte {
+	h, err := bcrypt.GenerateFromPassword([]byte("no account has this password"), bcryptCost)
+	if err != nil {
+		panic(err) // only fails for passwords over 72 bytes or a bad cost
+	}
+	return h
+})
 
 type signupInput struct {
 	Email    string `json:"email"`
@@ -106,4 +121,75 @@ func checkPassword(password string) string {
 		return "Use at most 72 bytes (fewer if you use emoji or accented letters)."
 	}
 	return ""
+}
+
+type loginInput struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+// login answers POST /api/auth/login. A wrong email and a wrong password get
+// the same 401 in about the same time, so nobody can probe which emails have
+// accounts. Success sets a new session cookie and returns the /api/me body.
+func login(st *store.Store, logger *slog.Logger, cookieSecure bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var in loginInput
+		if !decodeJSON(w, r, &in) {
+			return
+		}
+		email := normalizeEmail(in.Email)
+		fields := map[string]string{}
+		if email == "" {
+			fields["email"] = "Enter your email address."
+		}
+		if in.Password == "" {
+			fields["password"] = "Enter your password."
+		}
+		if len(fields) > 0 {
+			writeValidationError(w, fields)
+			return
+		}
+
+		u, hash, err := st.UserCredentials(r.Context(), email)
+		if errors.Is(err, store.ErrNotFound) {
+			_ = compareHash(dummyHash(), []byte(in.Password)) // same work as a real check
+			writeInvalidCredentials(w)
+			return
+		}
+		if err != nil {
+			internalError(w, r, logger, err)
+			return
+		}
+		if compareHash([]byte(hash), []byte(in.Password)) != nil {
+			writeInvalidCredentials(w)
+			return
+		}
+
+		token, expiresAt, err := st.CreateSession(r.Context(), u.ID)
+		if err != nil {
+			internalError(w, r, logger, err)
+			return
+		}
+		setSessionCookie(w, token, expiresAt, cookieSecure)
+		writeJSON(w, http.StatusOK, toMe(u))
+	}
+}
+
+func writeInvalidCredentials(w http.ResponseWriter) {
+	writeError(w, http.StatusUnauthorized, "invalid_credentials", "That email and password don't match an account.")
+}
+
+// logout answers POST /api/auth/logout: it deletes the session (if any) and
+// clears the cookie. Logging out while logged out is fine too: 204 either way.
+func logout(st *store.Store, logger *slog.Logger, cookieSecure bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if c, err := r.Cookie(sessionCookie); err == nil && c.Value != "" {
+			if err := st.DeleteSession(r.Context(), c.Value); err != nil {
+				internalError(w, r, logger, err)
+				return
+			}
+		}
+		clearSessionCookie(w, cookieSecure)
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
