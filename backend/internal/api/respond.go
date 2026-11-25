@@ -21,6 +21,8 @@ type errorBody struct {
 type errorDetail struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+	// Fields maps a request field to what's wrong with it; only on validation_failed.
+	Fields map[string]string `json:"fields,omitempty"`
 }
 
 // internalError logs err with the request and sends a 500 that reveals nothing.
@@ -34,4 +36,14 @@ func internalError(w http.ResponseWriter, r *http.Request, logger *slog.Logger, 
 // machine-readable; the message is safe to show to users.
 func writeError(w http.ResponseWriter, status int, code, message string) {
 	writeJSON(w, status, errorBody{Error: errorDetail{Code: code, Message: message}})
+}
+
+// writeValidationError sends 400 validation_failed with a message per field,
+// so a form can show each one next to its input.
+func writeValidationError(w http.ResponseWriter, fields map[string]string) {
+	writeJSON(w, http.StatusBadRequest, errorBody{Error: errorDetail{
+		Code:    "validation_failed",
+		Message: "Some fields need fixing.",
+		Fields:  fields,
+	}})
 }

@@ -39,6 +39,7 @@ func New(opts Options) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthz(opts.DB, opts.Logger, opts.PingTimeout))
 	mux.HandleFunc("GET /api/me", requireSeller(opts.Store, opts.Logger, me(opts.Store, opts.Logger)))
+	mux.HandleFunc("POST /api/auth/signup", signup(opts.Store, opts.Logger, opts.CookieSecure))
 
 	// CORS first, so preflights are answered before routing.
 	return cors(opts.FrontendOrigin, jsonRouting(mux))

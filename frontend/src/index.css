@@ -50,3 +50,46 @@ body {
 [role='alert'] {
   color: #b42318;
 }
+
+form {
+  display: grid;
+  gap: 1rem;
+  max-width: 24rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.field input {
+  font: inherit;
+  padding: 0.5rem;
+  border: 1px solid #8c959f;
+  border-radius: 0.375rem;
+}
+
+.field input[aria-invalid='true'] {
+  border-color: #b42318;
+}
+
+.field-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 0.875rem;
+}
+
+button {
+  font: inherit;
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-radius: 0.375rem;
+  background: #1f6feb;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}

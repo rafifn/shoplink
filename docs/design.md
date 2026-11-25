@@ -183,7 +183,7 @@ Schema rules: `stock` has a `CHECK (stock >= 0)` constraint as a second safety n
 | `GET /api/c/{slug}` | Public | Checkout form with its products |
 | `POST /api/c/{slug}/orders` | Public | Place an order |
 
-Every seller route checks that the record belongs to the logged-in seller and returns 404 otherwise, so other sellers' IDs can't be probed. Errors use one JSON shape, `{"error": {"code", "message"}}`, which the frontend shows to the user. The public order route is rate-limited per IP address to slow down spam.
+Every seller route checks that the record belongs to the logged-in seller and returns 404 otherwise, so other sellers' IDs can't be probed. Errors use one JSON shape, `{"error": {"code", "message"}}`, which the frontend shows to the user; a validation error (`validation_failed`) adds `"fields": {"<field>": "<message>"}` so forms can show each message next to its input. The public order route is rate-limited per IP address to slow down spam.
 
 ## Database access
 

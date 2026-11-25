@@ -116,8 +116,9 @@ func assertErrorBody(t *testing.T, raw []byte, wantCode string) {
 	t.Helper()
 	var body struct {
 		Error *struct {
-			Code    string `json:"code"`
-			Message string `json:"message"`
+			Code    string            `json:"code"`
+			Message string            `json:"message"`
+			Fields  map[string]string `json:"fields"` // only on validation_failed
 		} `json:"error"`
 	}
 	dec := json.NewDecoder(strings.NewReader(string(raw)))
