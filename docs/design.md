@@ -195,7 +195,7 @@ The agent reaches the database through the terminal, using the same local Postgr
 - **Agent inspects with `make db-shell`,** which wraps `docker compose exec db psql -U shoplink_readonly shoplink`. It can run any `SELECT` but can't change data.
 - **Schema changes only through migration files:** `make migration name=<name>` creates one, `make migrate` applies it, and the file is reviewed in the pull request like any code.
 - **Production stays out of reach:** the production database runs in a container on the VPS with no port open to the internet, and its password lives only in the server's `.env`. That password and the server's SSH deploy key never appear in the repo, the local `.env`, `CLAUDE.md`, or tickets, and the agent never gets a shell on the server.
-- **Nightly backups:** a scheduled `pg_dump` copies the production database to storage outside the server and keeps the last 14 dumps. Restore steps live in `docs/deploy.md` and are tested once.
+- **Nightly backups:** a scheduled `pg_dump` keeps the last 14 dumps of the production database on the VPS. There is no off-server copy for now (see Decisions). Restore steps live in `docs/deploy.md` and are tested once.
 - **CI and the GitHub Action** start an empty Postgres for each run, apply migrations, run the tests, and throw it away.
 - **You use DBeaver** on `localhost:5432` with the credentials from `.env` (copied from the committed `.env.example`). Log in as `shoplink` when you want to edit test data by hand.
 
@@ -225,7 +225,7 @@ AI coding agents (Claude Code) write most of the code in small, test-first steps
 - When a bug reaches the demo, first write the test that would have caught it.
 - Keep a short `docs/agent-notes.md` log of what worked and what didn't. It makes a strong interview story.
 
-**Continuous integration:** a GitHub Actions workflow runs `make check` and the end-to-end tests on every push and pull request. Merges to `main` build the Docker images, push them to ghcr.io, and deploy to the VPS over SSH; the deploy fails if `/healthz` doesn't answer afterwards.
+**Continuous integration:** a GitHub Actions workflow runs `make check` and the end-to-end tests on every push and pull request. Merges to `main` build the Docker images, push them to ghcr.io, and deploy to the VPS over SSH; the deploy fails if `/healthz` doesn't answer afterwards. Deploying is on hold until there is a server and a domain (see Decisions).
 
 ## Ticket workflow
 
@@ -269,8 +269,8 @@ A failing check sends work back to the agent before you ever see it, and your re
 
 Five phases, each ending with something deployed and showable; phase 4 is optional.
 
-1. **Phase 0: Foundation.** Repo, `CLAUDE.md`, issue template, board, local database set up by the agent (Docker Compose, two database users, first migration, seed data), empty Go server with a `/healthz` route, empty React app, `make check`, CI, the VPS set up, and the app deployed to it with nightly backups.
-   - Done when: CI is green and the live site shows "API OK" from the backend over HTTPS.
+1. **Phase 0: Foundation.** Repo, `CLAUDE.md`, issue template, board, local database set up by the agent (Docker Compose, two database users, first migration, seed data), empty Go server with a `/healthz` route, empty React app, `make check`, CI, and the production stack (Caddy, the API, and Postgres in Docker Compose) ready to deploy.
+   - Done when: CI is green and `make prod-test` shows "API OK" from the backend over HTTPS, with the production stack running locally. Deploying to a server moved out of Phase 0 (see Decisions).
 2. **Phase 1: Seller accounts and products.** Sign up, log in, log out, and product add/edit/archive with image URL.
    - Done when: a seller can manage products on the live site, and tests prove one seller can't read another's products.
 3. **Phase 2: Checkout forms and ordering.** Create and switch off forms, the public checkout page, placing orders, stock handling.
@@ -285,6 +285,10 @@ Five phases, each ending with something deployed and showable; phase 4 is option
 You decided the app, its name, the frontend-plus-Go-API split, the agentic, ticket-driven workflow, and hosting on a single VPS; the rest below are my calls, which you can overturn.
 
 **Hosting on a VPS (decided Nov 18, 2026):** you chose one VPS over Render and Vercel. It avoids free-tier servers that sleep and make a recruiter's first click wait, keeps the cost fixed, and puts the app and API on one domain. The price is server upkeep, HTTPS, and backups, which are covered in Phase 0.
+
+**Backups stay on the VPS (decided Nov 23, 2026):** no paid storage. Nightly dumps kept on the server protect against mistakes such as a bad migration or deleted rows, but not against losing the server. That's acceptable while the database holds only demo data; revisit before real orders arrive. Free off-server options: rclone to Google Drive, or pulling dumps to a laptop.
+
+**Deploy on hold (decided Nov 25, 2026):** there is no domain and no production server yet, so deploying from CI (#10) waits. Until it restarts, "the live site" in the phase done conditions means the production stack running locally with `make prod-test`.
 
 **Calls made for you**
 
