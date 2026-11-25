@@ -89,7 +89,8 @@ grep -q 'localhost:8080' <<<"$bundle" \
   && bad "the bundle has localhost:8080 baked in (VITE_API_URL leaked into the build)" \
   || pass "the bundle calls the API with relative paths"
 
-[[ "$(https https://localhost/api/no-such-route)" == "404 page not found" ]] \
+# Only the Go API answers unknown /api paths with its JSON 404; Caddy would serve index.html.
+grep -q '"code":"not_found"' <<<"$(https https://localhost/api/no-such-route)" \
   && pass "/api/* is proxied to the Go API" || bad "/api/* did not reach the Go API"
 
 https -D - -o /dev/null -H 'Origin: https://evil.example.com' https://localhost/healthz | grep -qi '^access-control-allow' \
