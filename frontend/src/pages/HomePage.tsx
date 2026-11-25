@@ -39,9 +39,9 @@ export function HomePage() {
   }, [])
 
   return (
-    <main>
+    <section>
       <h1>ShopLink</h1>
       <p role="status">{label[status]}</p>
-    </main>
+    </section>
   )
 }

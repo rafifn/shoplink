@@ -1,0 +1,52 @@
+/* Plain, readable defaults that work on a phone. No styling system yet. */
+:root {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
+  color: #1f2328;
+  background: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.site-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #d0d7de;
+}
+
+.brand {
+  font-weight: 700;
+  color: inherit;
+  text-decoration: none;
+}
+
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.shop-name {
+  color: #59636e;
+}
+
+.page {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+[role='alert'] {
+  color: #b42318;
+}
