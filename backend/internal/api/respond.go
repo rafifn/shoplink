@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 )
 
@@ -20,6 +21,12 @@ type errorBody struct {
 type errorDetail struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+}
+
+// internalError logs err with the request and sends a 500 that reveals nothing.
+func internalError(w http.ResponseWriter, r *http.Request, logger *slog.Logger, err error) {
+	logger.ErrorContext(r.Context(), "request failed", "method", r.Method, "path", r.URL.Path, "err", err)
+	writeError(w, http.StatusInternalServerError, "internal_error", "Something went wrong on our side. Please try again.")
 }
 
 // writeError sends the one error shape the frontend understands:

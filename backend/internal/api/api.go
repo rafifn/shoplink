@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/rafifn/shoplink/backend/internal/store"
 )
 
 // Pinger checks that the database is reachable. *pgxpool.Pool satisfies it.
@@ -22,6 +24,10 @@ type Options struct {
 	FrontendOrigin string
 	// PingTimeout bounds the database check in /healthz. Defaults to 2s.
 	PingTimeout time.Duration
+	// Store runs every database query except the health ping.
+	Store *store.Store
+	// CookieSecure marks the session cookie Secure (HTTPS only).
+	CookieSecure bool
 }
 
 // New returns the API's HTTP handler.
@@ -32,6 +38,7 @@ func New(opts Options) http.Handler {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthz(opts.DB, opts.Logger, opts.PingTimeout))
+	mux.HandleFunc("GET /api/me", requireSeller(opts.Store, opts.Logger, me(opts.Store, opts.Logger)))
 
 	// CORS first, so preflights are answered before routing.
 	return cors(opts.FrontendOrigin, jsonRouting(mux))
