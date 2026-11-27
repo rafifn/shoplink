@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/rafifn/shoplink/backend/internal/testdb"
@@ -46,5 +47,46 @@ func TestCreateAndListProducts(t *testing.T) {
 	empty, err := s.ListProducts(t.Context(), testdb.CreateUser(t, pool, "c@example.com", "Shop C"))
 	if err != nil || empty == nil || len(empty) != 0 {
 		t.Errorf("ListProducts for a new seller = %#v, %v; want an empty, non-nil list", empty, err)
+	}
+}
+
+func TestProductByIDAndUpdateAreScopedToTheSeller(t *testing.T) {
+	pool := testdb.New(t)
+	s := New(pool)
+	sellerA := testdb.CreateUser(t, pool, "a@example.com", "Shop A")
+	sellerB := testdb.CreateUser(t, pool, "b@example.com", "Shop B")
+	mug, err := s.CreateProduct(t.Context(), sellerA, NewProduct{Name: "Mug", PriceSen: 100, Stock: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got, err := s.ProductByID(t.Context(), sellerA, mug.ID); err != nil || got != mug {
+		t.Errorf("ProductByID(owner) = %+v, %v", got, err)
+	}
+	if _, err := s.ProductByID(t.Context(), sellerB, mug.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("ProductByID(other seller): err = %v, want ErrNotFound", err)
+	}
+
+	changed := NewProduct{Name: "Big mug", PriceSen: 200, Stock: 0}
+	if _, err := s.UpdateProduct(t.Context(), sellerB, mug.ID, changed); !errors.Is(err, ErrNotFound) {
+		t.Errorf("UpdateProduct(other seller): err = %v, want ErrNotFound", err)
+	}
+	if got, _ := s.ProductByID(t.Context(), sellerA, mug.ID); got != mug {
+		t.Errorf("another seller's update changed the product: %+v", got)
+	}
+
+	updated, err := s.UpdateProduct(t.Context(), sellerA, mug.ID, changed)
+	if err != nil || updated.Name != "Big mug" || updated.PriceSen != 200 || updated.Stock != 0 || updated.ID != mug.ID {
+		t.Errorf("UpdateProduct(owner) = %+v, %v", updated, err)
+	}
+
+	if _, err := pool.Exec(t.Context(), "update products set archived_at = now() where id = $1", mug.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ProductByID(t.Context(), sellerA, mug.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("ProductByID(archived): err = %v, want ErrNotFound", err)
+	}
+	if _, err := s.UpdateProduct(t.Context(), sellerA, mug.ID, changed); !errors.Is(err, ErrNotFound) {
+		t.Errorf("UpdateProduct(archived): err = %v, want ErrNotFound", err)
 	}
 }

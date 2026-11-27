@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -69,4 +70,38 @@ func (s *Store) CreateProduct(ctx context.Context, sellerID int64, p NewProduct)
 		return Product{}, fmt.Errorf("create product: %w", err)
 	}
 	return created, nil
+}
+
+// ProductByID returns one of the seller's live products. Another seller's
+// product, an archived one, or a missing ID all give ErrNotFound, so callers
+// can't tell them apart (and answer 404, never 403).
+func (s *Store) ProductByID(ctx context.Context, sellerID, id int64) (Product, error) {
+	p, err := scanProduct(s.pool.QueryRow(ctx,
+		"select "+productColumns+" from products where id = $1 and seller_id = $2 and archived_at is null",
+		id, sellerID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Product{}, ErrNotFound
+	}
+	if err != nil {
+		return Product{}, fmt.Errorf("product by id: %w", err)
+	}
+	return p, nil
+}
+
+// UpdateProduct replaces the editable fields of one of the seller's live
+// products. Same ErrNotFound rule as ProductByID.
+func (s *Store) UpdateProduct(ctx context.Context, sellerID, id int64, p NewProduct) (Product, error) {
+	updated, err := scanProduct(s.pool.QueryRow(ctx,
+		`update products
+		    set name = $3, description = $4, price_sen = $5, stock = $6, image_url = $7
+		  where id = $1 and seller_id = $2 and archived_at is null
+		returning `+productColumns,
+		id, sellerID, p.Name, p.Description, p.PriceSen, p.Stock, p.ImageURL))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Product{}, ErrNotFound
+	}
+	if err != nil {
+		return Product{}, fmt.Errorf("update product: %w", err)
+	}
+	return updated, nil
 }
