@@ -51,3 +51,19 @@ func (s *Store) CreateUser(ctx context.Context, email, passwordHash, shopName st
 	}
 	return u, nil
 }
+
+// UserCredentials returns the seller with a normalized email and their
+// password hash, for checking a login. Returns ErrNotFound for an unknown email.
+func (s *Store) UserCredentials(ctx context.Context, email string) (User, string, error) {
+	var u User
+	var hash string
+	err := s.pool.QueryRow(ctx, "select id, email, shop_name, password_hash from users where email = $1", email).
+		Scan(&u.ID, &u.Email, &u.ShopName, &hash)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return User{}, "", ErrNotFound
+	}
+	if err != nil {
+		return User{}, "", fmt.Errorf("user credentials: %w", err)
+	}
+	return u, hash, nil
+}

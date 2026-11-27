@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { createMemoryRouter, RouterProvider } from 'react-router'
+import { createMemoryRouter } from 'react-router'
+import { RouterProvider } from 'react-router/dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { routes } from '../routes'

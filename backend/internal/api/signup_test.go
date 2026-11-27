@@ -169,3 +169,14 @@ func TestSignupEmailTaken(t *testing.T) {
 		t.Error("a failed signup must not set a cookie")
 	}
 }
+
+// jsonEqual reports whether two JSON documents hold the same value.
+func jsonEqual(a, b string) bool {
+	var x, y any
+	if json.Unmarshal([]byte(a), &x) != nil || json.Unmarshal([]byte(b), &y) != nil {
+		return false
+	}
+	xa, _ := json.Marshal(x)
+	ya, _ := json.Marshal(y)
+	return string(xa) == string(ya)
+}

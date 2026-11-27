@@ -2,6 +2,7 @@
 # Checks `make seed` and the safety guard on `make db-reset`:
 #   - seed creates one demo seller with a bcrypt hash of DEMO_SELLER_PASSWORD, plus 3-5 products
 #   - running seed again adds no duplicates and doesn't fail
+#   - the demo seller can log in through the real API
 #   - db-reset refuses to run when DATABASE_URL points anywhere but this machine
 # Seeding runs in a throwaway database (shoplink_seedtest) that is dropped afterwards.
 # Run with: make db-test (needs the local database from `make db-up`).
@@ -57,7 +58,23 @@ make -s seed DATABASE_URL="$URL" >/dev/null 2>&1 && pass "make seed again succee
 [[ "$(sql -c "select count(*) from users")" == "1" && "$(sql -c "select count(*) from products")" == "$products" ]] \
   && pass "second seed adds no duplicate users or products" || bad "second seed created duplicates"
 
-# 3. db-reset guard: must refuse non-local DATABASE_URLs before touching anything.
+# 3. The demo seller logs in through the real API (built from source) on the seeded database.
+API_PORT=18090
+JAR=$(mktemp)
+(cd backend && go build -o bin/api ./cmd/api)
+DATABASE_URL="$URL" PORT=$API_PORT COOKIE_SECURE=false FRONTEND_ORIGIN= backend/bin/api >/dev/null 2>&1 &
+api_pid=$!
+trap 'kill $api_pid 2>/dev/null || true; rm -f "$JAR"; cleanup' EXIT
+curl -s -o /dev/null --retry 20 --retry-delay 1 --retry-connrefused "http://localhost:${API_PORT}/healthz"
+login_status=$(curl -s -o /dev/null -w '%{http_code}' -c "$JAR" -H 'Content-Type: application/json' \
+  -d "{\"email\":\"${DEMO_SELLER_EMAIL}\",\"password\":\"${DEMO_SELLER_PASSWORD}\"}" "http://localhost:${API_PORT}/api/auth/login")
+me=$(curl -s -b "$JAR" "http://localhost:${API_PORT}/api/me")
+[[ "$login_status" == "200" ]] && grep -q "\"shopName\":\"Demo Shop\"" <<<"$me" \
+  && pass "the demo seller logs in through the API with DEMO_SELLER_PASSWORD" \
+  || bad "the demo seller can't log in (login HTTP ${login_status}, /api/me: ${me})"
+kill $api_pid 2>/dev/null || true
+
+# 4. db-reset guard: must refuse non-local DATABASE_URLs before touching anything.
 for remote in "postgres://u:p@db.example.com:5432/shoplink" "postgres://u:p@10.0.0.5/shoplink" "postgres://u:p@localhost.evil.com/shoplink"; do
   if out=$(make -s db-reset DATABASE_URL="$remote" 2>&1); then
     bad "db-reset ran against ${remote}"

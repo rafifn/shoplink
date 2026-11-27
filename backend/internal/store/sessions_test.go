@@ -150,3 +150,20 @@ func TestCreateUser(t *testing.T) {
 		t.Errorf("same email again: err = %v, want ErrEmailTaken", err)
 	}
 }
+
+func TestUserCredentials(t *testing.T) {
+	pool := testdb.New(t)
+	s := New(pool)
+	created, err := s.CreateUser(t.Context(), "cred@example.com", "$2a$10$the-hash", "Toko Cred")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	u, hash, err := s.UserCredentials(t.Context(), "cred@example.com")
+	if err != nil || u != created || hash != "$2a$10$the-hash" {
+		t.Errorf("UserCredentials = %+v, %q, %v", u, hash, err)
+	}
+	if _, _, err := s.UserCredentials(t.Context(), "missing@example.com"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("missing email: err = %v, want ErrNotFound", err)
+	}
+}
