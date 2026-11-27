@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes } from 'react'
+import type { InputHTMLAttributes, TextareaHTMLAttributes } from 'react'
 
 type FieldProps = {
   id: string
@@ -19,6 +19,34 @@ export function Field({ id, label, error, ...input }: FieldProps) {
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
         {...input}
+      />
+      {error && (
+        <p id={errorId} className="field-error">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
+type TextAreaFieldProps = {
+  id: string
+  label: string
+  error?: string
+} & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'id'>
+
+/** Like Field, for longer text. */
+export function TextAreaField({ id, label, error, ...textarea }: TextAreaFieldProps) {
+  const errorId = `${id}-error`
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <textarea
+        id={id}
+        name={id}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        {...textarea}
       />
       {error && (
         <p id={errorId} className="field-error">
