@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { formatRupiah, MAX_SEN, parseRupiah } from './money'
 
 // Intl puts a non-breaking space (U+00A0) between "Rp" and the number.
-const NBSP = ' '
+const NBSP = '\u00a0'
 
 describe('formatRupiah', () => {
   it.each([
