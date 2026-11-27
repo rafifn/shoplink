@@ -2,6 +2,7 @@ import type { RouteObject } from 'react-router'
 
 import { RequireSeller } from './auth/RequireSeller'
 import { App } from './Layout'
+import { EditProductPage } from './pages/EditProductPage'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -17,7 +18,13 @@ export const routes: RouteObject[] = [
       { path: '/login', Component: LoginPage },
       { path: '/signup', Component: SignupPage },
       // Seller-only pages: logged-out visitors are sent to /login.
-      { Component: RequireSeller, children: [{ path: '/products', Component: ProductsPage }] },
+      {
+        Component: RequireSeller,
+        children: [
+          { path: '/products', Component: ProductsPage },
+          { path: '/products/:id/edit', Component: EditProductPage },
+        ],
+      },
       { path: '*', Component: NotFoundPage },
     ],
   },

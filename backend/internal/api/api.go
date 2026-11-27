@@ -44,6 +44,8 @@ func New(opts Options) http.Handler {
 	mux.HandleFunc("POST /api/auth/logout", logout(opts.Store, opts.Logger, opts.CookieSecure))
 	mux.HandleFunc("GET /api/products", requireSeller(opts.Store, opts.Logger, listProducts(opts.Store, opts.Logger)))
 	mux.HandleFunc("POST /api/products", requireSeller(opts.Store, opts.Logger, createProduct(opts.Store, opts.Logger)))
+	mux.HandleFunc("GET /api/products/{id}", requireSeller(opts.Store, opts.Logger, getProduct(opts.Store, opts.Logger)))
+	mux.HandleFunc("PATCH /api/products/{id}", requireSeller(opts.Store, opts.Logger, patchProduct(opts.Store, opts.Logger)))
 
 	// CORS first, so preflights are answered before routing.
 	return cors(opts.FrontendOrigin, jsonRouting(mux))
