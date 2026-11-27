@@ -83,3 +83,26 @@ describe('apiFetch', () => {
     await expect(apiFetch('/api/me')).rejects.toBe(abort)
   })
 })
+
+describe('apiFetch validation errors', () => {
+  it('passes the per-field messages through', async () => {
+    mockApi({
+      '/api/auth/signup': () =>
+        jsonResponse(400, {
+          error: { code: 'validation_failed', message: 'Some fields need fixing.', fields: { email: 'Enter a valid email.' } },
+        }),
+    })
+
+    const err = await apiFetch('/api/auth/signup', { method: 'POST', body: {} }).catch((e: unknown) => e)
+
+    expect(err).toMatchObject({ code: 'validation_failed', fields: { email: 'Enter a valid email.' } })
+  })
+
+  it('gives other errors no field messages', async () => {
+    mockApi({ '/api/me': () => apiErrorResponse(401, 'unauthenticated') })
+
+    const err = await apiFetch('/api/me').catch((e: unknown) => e)
+
+    expect((err as ApiError).fields).toEqual({})
+  })
+})

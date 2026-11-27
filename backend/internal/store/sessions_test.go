@@ -134,3 +134,19 @@ func TestUserByID(t *testing.T) {
 		t.Errorf("missing user: err = %v, want ErrNotFound", err)
 	}
 }
+
+func TestCreateUser(t *testing.T) {
+	pool := testdb.New(t)
+	s := New(pool)
+
+	u, err := s.CreateUser(t.Context(), "new@example.com", "$2a$10$hash", "Toko Baru")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.ID == 0 || u.Email != "new@example.com" || u.ShopName != "Toko Baru" {
+		t.Errorf("CreateUser = %+v", u)
+	}
+	if _, err := s.CreateUser(t.Context(), "new@example.com", "$2a$10$other", "Another"); !errors.Is(err, ErrEmailTaken) {
+		t.Errorf("same email again: err = %v, want ErrEmailTaken", err)
+	}
+}

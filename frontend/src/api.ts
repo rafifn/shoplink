@@ -31,16 +31,22 @@ export async function isApiHealthy(signal?: AbortSignal): Promise<boolean> {
   }
 }
 
-/** An API call that failed. `code` and `message` come from the API's error shape when it sent one. */
+/**
+ * An API call that failed. `code` and `message` come from the API's error
+ * shape when it sent one; `fields` maps form fields to their messages on a
+ * validation_failed error, and is empty otherwise.
+ */
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
+  readonly fields: Record<string, string>
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, fields: Record<string, string> = {}) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+    this.fields = fields
   }
 }
 
@@ -96,7 +102,7 @@ async function errorFrom(res: Response): Promise<ApiError> {
   try {
     const body: unknown = await res.json()
     if (isErrorShape(body)) {
-      return new ApiError(res.status, body.error.code, body.error.message)
+      return new ApiError(res.status, body.error.code, body.error.message, stringFields(body.error))
     }
   } catch {
     // Not JSON, e.g. a proxy's HTML error page.
@@ -110,6 +116,19 @@ function isErrorShape(v: unknown): v is { error: { code: string; message: string
   }
   const e = v.error
   return typeof e === 'object' && e !== null && 'code' in e && typeof e.code === 'string' && 'message' in e && typeof e.message === 'string'
+}
+
+/** The error's `fields`, keeping only string messages. */
+function stringFields(error: object): Record<string, string> {
+  const fields: Record<string, string> = {}
+  if ('fields' in error && typeof error.fields === 'object' && error.fields !== null) {
+    for (const [name, message] of Object.entries(error.fields)) {
+      if (typeof message === 'string') {
+        fields[name] = message
+      }
+    }
+  }
+  return fields
 }
 
 function isAbort(err: unknown): boolean {

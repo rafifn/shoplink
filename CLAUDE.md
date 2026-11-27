@@ -30,7 +30,7 @@ Design: docs/design.md. Read the section your ticket points to before starting.
 - Every seller query filters by seller_id from the session. Return 404, not 403, for other sellers' records.
 - Money is rupiah in integer sen: `bigint` columns named `*_sen` (Rp 1.000,75 is 100075). Never use floats for money.
 - Stock changes happen inside a transaction with row locking.
-- Errors are JSON: {"error": {"code": "...", "message": "..."}}.
+- Errors are JSON: {"error": {"code": "...", "message": "..."}}. Validation errors (400 validation_failed) add "fields": {"<field>": "<message>"}.
 - No secrets in code, tests, logs, or commits. Use environment variables.
 - Keep changes inside the ticket's scope. If you find other problems, open a new issue instead.
 - Database: only inspect the local Docker database, through make db-shell. Never connect to a hosted or production database.
